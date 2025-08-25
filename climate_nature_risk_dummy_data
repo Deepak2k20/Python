@@ -2,42 +2,32 @@ import pandas as pd
 import random
 import numpy as np
 
-# --- Helper Functions to Replace Faker ---
+# --- Helper Functions (No Faker) ---
 
 def generate_company_name():
-    """Generates a plausible random company name."""
     prefixes = ['Apex', 'Global', 'Volta', 'Sahara', 'Kalahari', 'Quantum', 'Nile', 'Congo Basin']
     suffixes = ['Resources', 'Energy', 'Materials', 'Farms', 'Power', 'Holdings', 'Exports']
     endings = ['Ltd.', 'Plc.', 'SA']
     return f"{random.choice(prefixes)} {random.choice(suffixes)} {random.choice(endings)}"
 
 def generate_african_coords():
-    """Generates random latitude and longitude constrained roughly to the African continent."""
-    # Africa's rough coordinates: Lat: -35 to 38, Long: -18 to 52
     lat = random.uniform(-35, 38)
     lon = random.uniform(-18, 52)
     return round(lat, 6), round(lon, 6)
 
-
 # --- Configuration ---
 NUM_RECORDS = 500
-FILENAME = "climate_nature_risk_report_data_v2.csv"
+FILENAME = "climate_nature_risk_report_advanced.csv"
 
-# --- Realistic Data Choices & Logic ---
-AFRICAN_COUNTRIES = [
-    'Nigeria', 'Ghana', 'Kenya', 'Togo', 'Ivory Coast', 
-    'South Africa', 'Uganda', 'Tanzania', 'Senegal', 'Cameroon'
-]
+# --- Risk Profile Definitions ---
 INDUSTRY_SECTORS = {
-    'Energy': {'gics': 'Energy', 'transition_risk': 'High'},
-    'Materials': {'gics': 'Materials', 'transition_risk': 'High'},
-    'Utilities': {'gics': 'Utilities', 'transition_risk': 'High'},
-    'Industrials': {'gics': 'Industrials', 'transition_risk': 'Medium'},
-    'Consumer Staples': {'gics': 'Food, Beverage & Tobacco', 'transition_risk': 'Medium'},
-    'Agriculture': {'gics': 'Food & Staples Retailing', 'transition_risk': 'Medium'},
-    'Information Technology': {'gics': 'Information Technology', 'transition_risk': 'Low'},
-    'Financials': {'gics': 'Banks', 'transition_risk': 'Low'},
-    'Renewables': {'gics': 'Independent Power & Renewable Electricity Producers', 'transition_risk': 'Low'}
+    'Energy': {'gics': 'Energy', 'transition_risk': 'High', 'base_pd': (0.05, 0.10)},
+    'Materials': {'gics': 'Materials', 'transition_risk': 'High', 'base_pd': (0.04, 0.09)},
+    'Utilities': {'gics': 'Utilities', 'transition_risk': 'High', 'base_pd': (0.03, 0.07)},
+    'Industrials': {'gics': 'Industrials', 'transition_risk': 'Medium', 'base_pd': (0.02, 0.05)},
+    'Agriculture': {'gics': 'Food & Staples Retailing', 'transition_risk': 'Medium', 'base_pd': (0.025, 0.06)},
+    'Renewables': {'gics': 'Independent Power & Renewable Electricity Producers', 'transition_risk': 'Low', 'base_pd': (0.01, 0.03)},
+    'Information Technology': {'gics': 'Information Technology', 'transition_risk': 'Low', 'base_pd': (0.005, 0.025)},
 }
 
 # --- Data Generation ---
@@ -45,48 +35,65 @@ data = []
 for i in range(NUM_RECORDS):
     sector_name = random.choice(list(INDUSTRY_SECTORS.keys()))
     sector_info = INDUSTRY_SECTORS[sector_name]
-    transition_risk_level = sector_info['transition_risk']
     
-    if transition_risk_level == 'High':
-        transition_score = random.choice([4, 5])
-        ghg_emissions = np.random.randint(10000, 100000)
-        climate_tag = 'High Transition Risk' if sector_name != 'Energy' else 'Fossil Fuel Exposure'
-    elif transition_risk_level == 'Medium':
-        transition_score = random.choice([2, 3])
-        ghg_emissions = np.random.randint(500, 9000)
-        climate_tag = 'Deforestation Risk' if sector_name == 'Agriculture' else 'Moderate Transition Risk'
-    else: # Low
-        transition_score = random.choice([1, 2])
-        ghg_emissions = np.random.randint(50, 800)
-        climate_tag = 'Green Loan' if sector_name == 'Renewables' else 'Low Transition Risk'
-        
+    # --- Step 1: Generate Base Financials ---
+    pd_range = sector_info['base_pd']
+    base_pd = random.uniform(pd_range[0], pd_range[1])
+    lgd = random.uniform(0.35, 0.70)
+    loan_amount = random.randint(1000000, 50000000)
+    ead = loan_amount * random.uniform(0.7, 1.0)
+    base_ecl = base_pd * lgd * ead
+
+    # --- Step 2: Generate Climate Risk Scores and Uplift Factor ---
+    physical_risk_score = random.randint(1, 5)
+    transition_risk_score = random.choice([4, 5]) if sector_info['transition_risk'] == 'High' else (random.choice([2, 3]) if sector_info['transition_risk'] == 'Medium' else random.choice([1, 2]))
+    
+    # Model a PD uplift based on climate scores. A score of 1 is baseline (no uplift).
+    # This is a simplified model; a real one would be more complex.
+    physical_uplift = (physical_risk_score - 1) * 0.08  # 8% uplift per score point
+    transition_uplift = (transition_risk_score - 1) * 0.12 # 12% uplift per score point
+    total_uplift_factor = physical_uplift + transition_uplift
+
+    # --- Step 3: Calculate Climate-Adjusted Metrics ---
+    climate_adjusted_pd = base_pd * (1 + total_uplift_factor)
+    # Cap PD at a realistic maximum, e.g., 90%
+    climate_adjusted_pd = min(climate_adjusted_pd, 0.90) 
+    
+    climate_adjusted_ecl = climate_adjusted_pd * lgd * ead
+    climate_value_at_risk = climate_adjusted_ecl - base_ecl
+    
+    # --- Assemble Record ---
     lat, lon = generate_african_coords()
-    
     record = {
-        'LoanID': f'CR{7001 + i}',
+        'LoanID': f'CR{8001 + i}',
         'BorrowerName': generate_company_name(),
-        'Country': random.choice(AFRICAN_COUNTRIES),
         'IndustrySector_GICS': sector_info['gics'],
-        'LoanAmountUSD': random.randint(1000000, 50000000),
-        'GHG_Emissions_tCO2e': ghg_emissions,
-        'PhysicalRiskScore': random.randint(1, 5),
-        'TransitionRiskScore': transition_score,
+        'LoanAmountUSD': loan_amount,
+        'EAD_USD': round(ead, 2),
+        'PhysicalRiskScore': physical_risk_score,
+        'TransitionRiskScore': transition_risk_score,
+        'Base_PD': round(base_pd, 4),
+        'Base_ECL_USD': round(base_ecl, 2),
+        'ClimateAdjusted_PD': round(climate_adjusted_pd, 4),
+        'ClimateAdjusted_ECL_USD': round(climate_adjusted_ecl, 2),
+        'Climate_Value_at_Risk_USD': round(climate_value_at_risk, 2),
         'Asset_Latitude': lat,
         'Asset_Longitude': lon,
-        'ClimateTag': climate_tag
     }
     data.append(record)
 
 # --- Create DataFrame and Save to CSV ---
 df_climate = pd.DataFrame(data)
 df_climate = df_climate[[
-    'LoanID', 'BorrowerName', 'Country', 'IndustrySector_GICS', 'LoanAmountUSD',
-    'GHG_Emissions_tCO2e', 'PhysicalRiskScore', 'TransitionRiskScore',
-    'Asset_Latitude', 'Asset_Longitude', 'ClimateTag'
+    'LoanID', 'BorrowerName', 'IndustrySector_GICS', 'LoanAmountUSD', 'EAD_USD',
+    'PhysicalRiskScore', 'TransitionRiskScore',
+    'Base_PD', 'ClimateAdjusted_PD',
+    'Base_ECL_USD', 'ClimateAdjusted_ECL_USD', 'Climate_Value_at_Risk_USD',
+    'Asset_Latitude', 'Asset_Longitude'
 ]]
 df_climate.to_csv(FILENAME, index=False)
 
-print(f"\nSuccessfully generated {NUM_RECORDS} sample records for the Climate & Nature Risk Report (no Faker).")
+print(f"\nSuccessfully generated {NUM_RECORDS} records for the Advanced Climate Risk Report.")
 print(f"File saved as: {FILENAME}")
 print("\n--- Sample Data Head ---")
 print(df_climate.head())

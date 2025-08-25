@@ -1,0 +1,61 @@
+import pandas as pd
+import random
+from faker import Faker
+from datetime import datetime
+
+# Initialize Faker for generating realistic data
+fake = Faker()
+
+# --- Configuration ---
+NUM_RECORDS = 200
+FILENAME = "dfi_fi_report_data.csv"
+
+# --- Realistic Data Choices ---
+AFRICAN_COUNTRIES = [
+    'Nigeria', 'Ghana', 'Kenya', 'Togo', 'Ivory Coast', 
+    'South Africa', 'Uganda', 'Tanzania', 'Senegal', 'Cameroon'
+]
+DFI_FUNDERS = ['IFC', 'AfDB', 'Proparco', 'EIB', 'FMO', 'DEG', 'Internal']
+ES_RISK_CATEGORIES = ['A', 'B', 'C', 'FI'] # Based on IFC standards
+REPORT_STATUSES = ['On-Time', 'Due Soon', 'Overdue']
+
+# --- Data Generation ---
+data = []
+for i in range(NUM_RECORDS):
+    # DFI funders are not on every loan, 'Internal' represents Ecobank's own funding
+    funder = random.choices(DFI_FUNDERS, weights=[0.2, 0.15, 0.1, 0.1, 0.05, 0.05, 0.35], k=1)[0]
+    
+    # Category B is often the most common for DFI projects
+    es_category = random.choices(ES_RISK_CATEGORIES, weights=[0.10, 0.55, 0.25, 0.10], k=1)[0]
+    
+    record = {
+        'LoanID': f'DFI{1001 + i}',
+        'BorrowerName': fake.company(),
+        'Country': random.choice(AFRICAN_COUNTRIES),
+        'LoanAmountUSD': random.randint(500000, 20000000),
+        'DFIFunder': funder,
+        'ES_RiskCategory': es_category,
+        'JobsSupported': random.randint(20, 800) if es_category != 'FI' else random.randint(500, 3000),
+        'GenderImpactScore': random.randint(1, 5),
+        'DisbursementDate': fake.date_between(start_date='-5y', end_date='today'),
+        'ReportStatus': random.choices(REPORT_STATUSES, weights=[0.85, 0.10, 0.05], k=1)[0]
+    }
+    data.append(record)
+
+# --- Create DataFrame and Save to CSV ---
+df = pd.DataFrame(data)
+
+# Reorder columns for clarity
+df = df[[
+    'LoanID', 'BorrowerName', 'Country', 'DFIFunder', 'LoanAmountUSD', 
+    'ES_RiskCategory', 'JobsSupported', 'GenderImpactScore', 
+    'DisbursementDate', 'ReportStatus'
+]]
+
+df.to_csv(FILENAME, index=False)
+
+print(f"Successfully generated {NUM_RECORDS} sample records for the DFI & FI Report.")
+print(f"File saved as: {FILENAME}")
+print("\n--- Sample Data Head ---")
+print(df.head())
+

@@ -1,14 +1,28 @@
 import pandas as pd
 import random
-from faker import Faker
-from datetime import datetime
+from datetime import datetime, timedelta
 
-# Initialize Faker for generating realistic data
-fake = Faker()
+# --- Helper Functions to Replace Faker ---
+
+def generate_company_name():
+    """Generates a plausible random company name."""
+    prefixes = ['Apex', 'Global', 'Starlight', 'Sunrise', 'Quantum', 'Keystone', 'Zenith', 'Pioneer']
+    suffixes = ['Solutions', 'Industries', 'Ventures', 'Logistics', 'Group', 'Holdings', 'Trading']
+    endings = ['Ltd.', 'Plc.', 'Inc.']
+    return f"{random.choice(prefixes)} {random.choice(suffixes)} {random.choice(endings)}"
+
+def generate_random_date(start_date, end_date):
+    """Generates a random date between two dates."""
+    time_between_dates = end_date - start_date
+    days_between_dates = time_between_dates.days
+    random_number_of_days = random.randrange(days_between_dates)
+    random_date = start_date + timedelta(days=random_number_of_days)
+    return random_date.strftime('%Y-%m-%d')
+
 
 # --- Configuration ---
 NUM_RECORDS = 200
-FILENAME = "dfi_fi_report_data.csv"
+FILENAME = "dfi_fi_report_data_v2.csv"
 
 # --- Realistic Data Choices ---
 AFRICAN_COUNTRIES = [
@@ -21,41 +35,37 @@ REPORT_STATUSES = ['On-Time', 'Due Soon', 'Overdue']
 
 # --- Data Generation ---
 data = []
+end_date = datetime.now()
+start_date = end_date - timedelta(days=5*365) # 5 years ago
+
 for i in range(NUM_RECORDS):
-    # DFI funders are not on every loan, 'Internal' represents Ecobank's own funding
     funder = random.choices(DFI_FUNDERS, weights=[0.2, 0.15, 0.1, 0.1, 0.05, 0.05, 0.35], k=1)[0]
-    
-    # Category B is often the most common for DFI projects
     es_category = random.choices(ES_RISK_CATEGORIES, weights=[0.10, 0.55, 0.25, 0.10], k=1)[0]
     
     record = {
         'LoanID': f'DFI{1001 + i}',
-        'BorrowerName': fake.company(),
+        'BorrowerName': generate_company_name(),
         'Country': random.choice(AFRICAN_COUNTRIES),
         'LoanAmountUSD': random.randint(500000, 20000000),
         'DFIFunder': funder,
         'ES_RiskCategory': es_category,
         'JobsSupported': random.randint(20, 800) if es_category != 'FI' else random.randint(500, 3000),
         'GenderImpactScore': random.randint(1, 5),
-        'DisbursementDate': fake.date_between(start_date='-5y', end_date='today'),
+        'DisbursementDate': generate_random_date(start_date, end_date),
         'ReportStatus': random.choices(REPORT_STATUSES, weights=[0.85, 0.10, 0.05], k=1)[0]
     }
     data.append(record)
 
 # --- Create DataFrame and Save to CSV ---
 df = pd.DataFrame(data)
-
-# Reorder columns for clarity
 df = df[[
     'LoanID', 'BorrowerName', 'Country', 'DFIFunder', 'LoanAmountUSD', 
     'ES_RiskCategory', 'JobsSupported', 'GenderImpactScore', 
     'DisbursementDate', 'ReportStatus'
 ]]
-
 df.to_csv(FILENAME, index=False)
 
-print(f"Successfully generated {NUM_RECORDS} sample records for the DFI & FI Report.")
+print(f"Successfully generated {NUM_RECORDS} sample records for the DFI & FI Report (no Faker).")
 print(f"File saved as: {FILENAME}")
 print("\n--- Sample Data Head ---")
 print(df.head())
-

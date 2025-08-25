@@ -1,71 +1,92 @@
 import pandas as pd
 import random
-from datetime import datetime, timedelta
+import numpy as np
 
 # --- Helper Functions to Replace Faker ---
 
 def generate_company_name():
     """Generates a plausible random company name."""
-    prefixes = ['Apex', 'Global', 'Starlight', 'Sunrise', 'Quantum', 'Keystone', 'Zenith', 'Pioneer']
-    suffixes = ['Solutions', 'Industries', 'Ventures', 'Logistics', 'Group', 'Holdings', 'Trading']
-    endings = ['Ltd.', 'Plc.', 'Inc.']
+    prefixes = ['Apex', 'Global', 'Volta', 'Sahara', 'Kalahari', 'Quantum', 'Nile', 'Congo Basin']
+    suffixes = ['Resources', 'Energy', 'Materials', 'Farms', 'Power', 'Holdings', 'Exports']
+    endings = ['Ltd.', 'Plc.', 'SA']
     return f"{random.choice(prefixes)} {random.choice(suffixes)} {random.choice(endings)}"
 
-def generate_random_date(start_date, end_date):
-    """Generates a random date between two dates."""
-    time_between_dates = end_date - start_date
-    days_between_dates = time_between_dates.days
-    random_number_of_days = random.randrange(days_between_dates)
-    random_date = start_date + timedelta(days=random_number_of_days)
-    return random_date.strftime('%Y-%m-%d')
+def generate_african_coords():
+    """Generates random latitude and longitude constrained roughly to the African continent."""
+    # Africa's rough coordinates: Lat: -35 to 38, Long: -18 to 52
+    lat = random.uniform(-35, 38)
+    lon = random.uniform(-18, 52)
+    return round(lat, 6), round(lon, 6)
 
 
 # --- Configuration ---
-NUM_RECORDS = 200
-FILENAME = "dfi_fi_report_data_v2.csv"
+NUM_RECORDS = 500
+FILENAME = "climate_nature_risk_report_data_v2.csv"
 
-# --- Realistic Data Choices ---
+# --- Realistic Data Choices & Logic ---
 AFRICAN_COUNTRIES = [
     'Nigeria', 'Ghana', 'Kenya', 'Togo', 'Ivory Coast', 
     'South Africa', 'Uganda', 'Tanzania', 'Senegal', 'Cameroon'
 ]
-DFI_FUNDERS = ['IFC', 'AfDB', 'Proparco', 'EIB', 'FMO', 'DEG', 'Internal']
-ES_RISK_CATEGORIES = ['A', 'B', 'C', 'FI'] # Based on IFC standards
-REPORT_STATUSES = ['On-Time', 'Due Soon', 'Overdue']
+INDUSTRY_SECTORS = {
+    'Energy': {'gics': 'Energy', 'transition_risk': 'High'},
+    'Materials': {'gics': 'Materials', 'transition_risk': 'High'},
+    'Utilities': {'gics': 'Utilities', 'transition_risk': 'High'},
+    'Industrials': {'gics': 'Industrials', 'transition_risk': 'Medium'},
+    'Consumer Staples': {'gics': 'Food, Beverage & Tobacco', 'transition_risk': 'Medium'},
+    'Agriculture': {'gics': 'Food & Staples Retailing', 'transition_risk': 'Medium'},
+    'Information Technology': {'gics': 'Information Technology', 'transition_risk': 'Low'},
+    'Financials': {'gics': 'Banks', 'transition_risk': 'Low'},
+    'Renewables': {'gics': 'Independent Power & Renewable Electricity Producers', 'transition_risk': 'Low'}
+}
 
 # --- Data Generation ---
 data = []
-end_date = datetime.now()
-start_date = end_date - timedelta(days=5*365) # 5 years ago
-
 for i in range(NUM_RECORDS):
-    funder = random.choices(DFI_FUNDERS, weights=[0.2, 0.15, 0.1, 0.1, 0.05, 0.05, 0.35], k=1)[0]
-    es_category = random.choices(ES_RISK_CATEGORIES, weights=[0.10, 0.55, 0.25, 0.10], k=1)[0]
+    sector_name = random.choice(list(INDUSTRY_SECTORS.keys()))
+    sector_info = INDUSTRY_SECTORS[sector_name]
+    transition_risk_level = sector_info['transition_risk']
+    
+    if transition_risk_level == 'High':
+        transition_score = random.choice([4, 5])
+        ghg_emissions = np.random.randint(10000, 100000)
+        climate_tag = 'High Transition Risk' if sector_name != 'Energy' else 'Fossil Fuel Exposure'
+    elif transition_risk_level == 'Medium':
+        transition_score = random.choice([2, 3])
+        ghg_emissions = np.random.randint(500, 9000)
+        climate_tag = 'Deforestation Risk' if sector_name == 'Agriculture' else 'Moderate Transition Risk'
+    else: # Low
+        transition_score = random.choice([1, 2])
+        ghg_emissions = np.random.randint(50, 800)
+        climate_tag = 'Green Loan' if sector_name == 'Renewables' else 'Low Transition Risk'
+        
+    lat, lon = generate_african_coords()
     
     record = {
-        'LoanID': f'DFI{1001 + i}',
+        'LoanID': f'CR{7001 + i}',
         'BorrowerName': generate_company_name(),
         'Country': random.choice(AFRICAN_COUNTRIES),
-        'LoanAmountUSD': random.randint(500000, 20000000),
-        'DFIFunder': funder,
-        'ES_RiskCategory': es_category,
-        'JobsSupported': random.randint(20, 800) if es_category != 'FI' else random.randint(500, 3000),
-        'GenderImpactScore': random.randint(1, 5),
-        'DisbursementDate': generate_random_date(start_date, end_date),
-        'ReportStatus': random.choices(REPORT_STATUSES, weights=[0.85, 0.10, 0.05], k=1)[0]
+        'IndustrySector_GICS': sector_info['gics'],
+        'LoanAmountUSD': random.randint(1000000, 50000000),
+        'GHG_Emissions_tCO2e': ghg_emissions,
+        'PhysicalRiskScore': random.randint(1, 5),
+        'TransitionRiskScore': transition_score,
+        'Asset_Latitude': lat,
+        'Asset_Longitude': lon,
+        'ClimateTag': climate_tag
     }
     data.append(record)
 
 # --- Create DataFrame and Save to CSV ---
-df = pd.DataFrame(data)
-df = df[[
-    'LoanID', 'BorrowerName', 'Country', 'DFIFunder', 'LoanAmountUSD', 
-    'ES_RiskCategory', 'JobsSupported', 'GenderImpactScore', 
-    'DisbursementDate', 'ReportStatus'
+df_climate = pd.DataFrame(data)
+df_climate = df_climate[[
+    'LoanID', 'BorrowerName', 'Country', 'IndustrySector_GICS', 'LoanAmountUSD',
+    'GHG_Emissions_tCO2e', 'PhysicalRiskScore', 'TransitionRiskScore',
+    'Asset_Latitude', 'Asset_Longitude', 'ClimateTag'
 ]]
-df.to_csv(FILENAME, index=False)
+df_climate.to_csv(FILENAME, index=False)
 
-print(f"Successfully generated {NUM_RECORDS} sample records for the DFI & FI Report (no Faker).")
+print(f"\nSuccessfully generated {NUM_RECORDS} sample records for the Climate & Nature Risk Report (no Faker).")
 print(f"File saved as: {FILENAME}")
 print("\n--- Sample Data Head ---")
-print(df.head())
+print(df_climate.head())
